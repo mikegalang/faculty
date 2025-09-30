@@ -1,0 +1,14 @@
+pymongo
+dotenv
+pymongo.errors
+io
+reportlab.platypus
+reportlab.lib
+reportlab.lib.pagesizes
+reportlab.lib.styles
+reportlab.lib.pagesizes
+streamlit
+pandas
+os
+matplotlib.pyplot
+numpy
