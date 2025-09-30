@@ -590,7 +590,7 @@ if "authenticated" not in st.session_state:
 
 # --- Demo credentials (replace with DB or API later) ---
 USERNAME = "admin"
-PASSWORD = ""
+PASSWORD = "12345"
 
 # --- Login Form ---
 if not st.session_state.authenticated:
