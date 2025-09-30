@@ -874,12 +874,15 @@ else:
     #with tab_student_progress_tracker:
     elif tab_index == "Student Progress Tracker":
 
+        selected_teacher = st.session_state.session_teacher
                 
         # Input filters
         filter_type = st.radio("Filter by:", ["Subject", "Course", "YearLevel", "Student ID"])
 
         if filter_type == "Subject":
-            subjects = subjectsCollection.distinct("Description")
+            #subjects = subjectsCollection.distinct("Description")
+            
+            subjects = sorted(subjectsCollection.distinct("Description", {"Teacher": selected_teacher}))
             selected_value = st.selectbox("Select Subject", subjects)
 
         elif filter_type == "Course":
