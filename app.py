@@ -72,7 +72,7 @@ def get_mongo_client():
     client = MongoClient(
         mongo_uri,
         serverSelectionTimeoutMS=5000,   # Fail fast if can't connect
-        socketTimeoutMS=20000,           # Time before dropping socket
+        socketTimeoutMS=60000,           # Time before dropping socket
         connectTimeoutMS=10000,          # Time to establish connection
         retryWrites=True,
         tls=True            )  # replace with your Mongo URI
