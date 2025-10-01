@@ -643,7 +643,7 @@ if not st.session_state.authenticated:
 else:
     st.title(f"Welcome, {st.session_state.session_teacher}!")
 
-    st.toast(f"It is good to see you, {st.session_state.session_teacher}!", icon="😍")
+    #st.toast(f"It is good to see you, {st.session_state.session_teacher}!", icon="😍")
 
     client = get_mongo_client()
     db = client["mit261n"]  
