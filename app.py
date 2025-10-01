@@ -1235,6 +1235,8 @@ else:
 
                 results = list(gradesCollection.aggregate(pipeline))
 
+                st.subheader("📑 Progress Tracker by Student ID")
+
                 import pandas as pd
                 df = pd.DataFrame(results, columns=[
                     "StudentID", "Name", "SemesterID", "SchoolYear", "Units", "Grade", "SemesterGPA"
