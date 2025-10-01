@@ -1788,51 +1788,52 @@ else:
 
     elif tab_index == "Custom Query Builder":
         
-            
-        # Checkboxes for filters
-        filter_subject = st.checkbox("Filter by SubjectCode")
-        filter_teacher = st.checkbox("Filter by TeacherName")
-        filter_student = st.checkbox("Filter by StudentName")
+        # Distinct values from MongoDB
+        subject_list = subjectsCollection.distinct("_id")
+        teacher_list = gradesCollection.distinct("Teachers")
+        student_list = studentsCollection.distinct("Name")
+
+        filter_subject = st.checkbox("Filter by Subject Code")
+        filter_teacher = st.checkbox("Filter by Teacher Name")
+        filter_student = st.checkbox("Filter by Student Name")
 
         query = {}
 
         # Input fields depending on selected filters
+        subject_code, teacher_name, student_name = None, None, None
+
         if filter_subject:
-            subject_code = st.text_input("Enter Subject Code")
-            if subject_code:
-                #query["SubjectCodes"] = subject_code
-                query["SubjectCodes"] = {"$in": [subject_code]}
+            subject_code = st.selectbox("Select Subject Code", subject_list)
 
         if filter_teacher:
-            teacher_name = st.text_input("Enter Teacher Name")
-            if teacher_name:
-                query["Teachers"] = teacher_name
+            teacher_name = st.selectbox("Select Teacher Name", teacher_list)
 
         if filter_student:
-            student_name = st.text_input("Enter Student Name")
+            student_name = st.selectbox("Select Student Name", student_list)
             if student_name:
-                student_doc = studentsCollection.find_one({"Name": {"$regex": student_name, "$options": "i"}})
+                student_doc = studentsCollection.find_one(
+                    {"Name": {"$regex": student_name, "$options": "i"}}
+                )
                 if student_doc:
                     query["StudentID"] = student_doc["_id"]
                 else:
                     st.warning("⚠️ No student found with that name.")
 
-        # -----------------------------
+        # -------------------------------
         # Query Execution
-        # -----------------------------
+        # -------------------------------
         if st.button("🔍 Search"):
 
             if not (filter_subject or filter_teacher or filter_student):
                 st.warning("⚠️ Please select at least one filter before searching.")
-            elif not query:
+            elif not query and not (subject_code or teacher_name):
                 st.info("ℹ️ No filter value entered yet.")
             else:
-                
                 with st.spinner("⏳ Fetching records..."):
                     data = list(gradesCollection.find(query))
                 records = []
 
-                with st.spinner("⏳ Building table to display data. One moment please..."):
+                with st.spinner("⏳ Building table to display data..."):
                     for doc in data:
                         student_id = doc.get("StudentID")
                         subject_codes = doc.get("SubjectCodes", [])
@@ -1840,92 +1841,180 @@ else:
                         teachers = doc.get("Teachers", [])
                         semester_id = doc.get("SemesterID")   
 
-                        # lookup student name
+                        # Lookup student name
                         student_doc = studentsCollection.find_one({"_id": student_id})
                         student_name = student_doc["Name"] if student_doc else "Unknown"
 
-                        # CASE 1: Both SubjectCode + Teacher filter applied
-                        if filter_subject and subject_code and filter_teacher and teacher_name:
-                            for i, subj_code in enumerate(subject_codes):
-                                teacher = teachers[i] if i < len(teachers) else None
-                                if subj_code == subject_code and teacher == teacher_name:
-                                    grade = grades[i] if i < len(grades) else None
-                                    subj_doc = subjectsCollection.find_one({"_id": subj_code})
-                                    subj_desc = subj_doc["Description"] if subj_doc else "Unknown"
+                        # Loop through subjects & apply filters
+                        for i, subj_code in enumerate(subject_codes):
+                            teacher = teachers[i] if i < len(teachers) else None
+                            grade = grades[i] if i < len(grades) else None
 
-                                    records.append({
-                                        "StudentID": student_id,
-                                        "StudentName": student_name,
-                                        "SubjectCode": subj_code,
-                                        "SubjectDescription": subj_desc,
-                                        "Teacher": teacher,
-                                        "Grade": grade,
-                                        "SemesterID": semester_id
-                                    })
+                            # Apply subject filter
+                            if filter_subject and subject_code and subj_code != subject_code:
+                                continue
+                            # Apply teacher filter
+                            if filter_teacher and teacher_name and teacher != teacher_name:
+                                continue
 
-                        # CASE 2: Only Subject filter applied
-                        elif filter_subject and subject_code:
-                            if subject_code in subject_codes:
-                                idx = subject_codes.index(subject_code)
-                                grade = grades[idx] if idx < len(grades) else None
-                                teacher = teachers[idx] if idx < len(teachers) else None
-                                subj_doc = subjectsCollection.find_one({"_id": subject_code})
-                                subj_desc = subj_doc["Description"] if subj_doc else "Unknown"
+                            subj_doc = subjectsCollection.find_one({"_id": subj_code})
+                            subj_desc = subj_doc["Description"] if subj_doc else "Unknown"
 
-                                records.append({
-                                    "StudentID": student_id,
-                                    "StudentName": student_name,
-                                    "SubjectCode": subject_code,
-                                    "SubjectDescription": subj_desc,
-                                    "Teacher": teacher,
-                                    "Grade": grade,
-                                    "SemesterID": semester_id
-                                })
+                            records.append({
+                                "StudentID": student_id,
+                                "StudentName": student_name,
+                                "SubjectCode": subj_code,
+                                "SubjectDescription": subj_desc,
+                                "Teacher": teacher,
+                                "Grade": grade,
+                                "SemesterID": semester_id
+                            })
 
-                        # CASE 3: Only Teacher filter applied
-                        elif filter_teacher and teacher_name:
-                            for i, teacher in enumerate(teachers):
-                                if teacher == teacher_name:
-                                    subj_code = subject_codes[i] if i < len(subject_codes) else None
-                                    grade = grades[i] if i < len(grades) else None
-                                    subj_doc = subjectsCollection.find_one({"_id": subj_code})
-                                    subj_desc = subj_doc["Description"] if subj_doc else "Unknown"
-
-                                    records.append({
-                                        "StudentID": student_id,
-                                        "StudentName": student_name,
-                                        "SubjectCode": subj_code,
-                                        "SubjectDescription": subj_desc,
-                                        "Teacher": teacher,
-                                        "Grade": grade,
-                                        "SemesterID": semester_id
-                                    })
-
-                        # CASE 4: No subject/teacher filter → show all
-                        else:
-                            for i, subj_code in enumerate(subject_codes):
-                                grade = grades[i] if i < len(grades) else None
-                                teacher = teachers[i] if i < len(teachers) else None
-                                subj_doc = subjectsCollection.find_one({"_id": subj_code})
-                                subj_desc = subj_doc["Description"] if subj_doc else "Unknown"
-
-                                records.append({
-                                    "StudentID": student_id,
-                                    "StudentName": student_name,
-                                    "SubjectCode": subj_code,
-                                    "SubjectDescription": subj_desc,
-                                    "Teacher": teacher,
-                                    "Grade": grade,
-                                    "SemesterID": semester_id
-                                })
-
-                                
+                    # Convert to DataFrame
                     df = pd.DataFrame(records)
 
                     if df.empty:
                         st.warning("⚠️ No records found.")
                     else:
-                        st.dataframe(df)
+                        st.dataframe(df, use_container_width=True, hide_index=True)
+            
+        # Checkboxes for filters
+        # filter_subject = st.checkbox("Filter by SubjectCode")
+        # filter_teacher = st.checkbox("Filter by TeacherName")
+        # filter_student = st.checkbox("Filter by StudentName")
+
+        # query = {}
+
+        # # Input fields depending on selected filters
+        # if filter_subject:
+        #     subject_code = st.text_input("Enter Subject Code")
+        #     if subject_code:
+        #         #query["SubjectCodes"] = subject_code
+        #         query["SubjectCodes"] = {"$in": [subject_code]}
+
+        # if filter_teacher:
+        #     teacher_name = st.text_input("Enter Teacher Name")
+        #     if teacher_name:
+        #         query["Teachers"] = teacher_name
+
+        # if filter_student:
+        #     student_name = st.text_input("Enter Student Name")
+        #     if student_name:
+        #         student_doc = studentsCollection.find_one({"Name": {"$regex": student_name, "$options": "i"}})
+        #         if student_doc:
+        #             query["StudentID"] = student_doc["_id"]
+        #         else:
+        #             st.warning("⚠️ No student found with that name.")
+
+        # # -----------------------------
+        # # Query Execution
+        # # -----------------------------
+        # if st.button("🔍 Search"):
+
+        #     if not (filter_subject or filter_teacher or filter_student):
+        #         st.warning("⚠️ Please select at least one filter before searching.")
+        #     elif not query:
+        #         st.info("ℹ️ No filter value entered yet.")
+        #     else:
+                
+        #         with st.spinner("⏳ Fetching records..."):
+        #             data = list(gradesCollection.find(query))
+        #         records = []
+
+        #         with st.spinner("⏳ Building table to display data. One moment please..."):
+        #             for doc in data:
+        #                 student_id = doc.get("StudentID")
+        #                 subject_codes = doc.get("SubjectCodes", [])
+        #                 grades = doc.get("Grades", [])
+        #                 teachers = doc.get("Teachers", [])
+        #                 semester_id = doc.get("SemesterID")   
+
+        #                 # lookup student name
+        #                 student_doc = studentsCollection.find_one({"_id": student_id})
+        #                 student_name = student_doc["Name"] if student_doc else "Unknown"
+
+        #                 # CASE 1: Both SubjectCode + Teacher filter applied
+        #                 if filter_subject and subject_code and filter_teacher and teacher_name:
+        #                     for i, subj_code in enumerate(subject_codes):
+        #                         teacher = teachers[i] if i < len(teachers) else None
+        #                         if subj_code == subject_code and teacher == teacher_name:
+        #                             grade = grades[i] if i < len(grades) else None
+        #                             subj_doc = subjectsCollection.find_one({"_id": subj_code})
+        #                             subj_desc = subj_doc["Description"] if subj_doc else "Unknown"
+
+        #                             records.append({
+        #                                 "StudentID": student_id,
+        #                                 "StudentName": student_name,
+        #                                 "SubjectCode": subj_code,
+        #                                 "SubjectDescription": subj_desc,
+        #                                 "Teacher": teacher,
+        #                                 "Grade": grade,
+        #                                 "SemesterID": semester_id
+        #                             })
+
+        #                 # CASE 2: Only Subject filter applied
+        #                 elif filter_subject and subject_code:
+        #                     if subject_code in subject_codes:
+        #                         idx = subject_codes.index(subject_code)
+        #                         grade = grades[idx] if idx < len(grades) else None
+        #                         teacher = teachers[idx] if idx < len(teachers) else None
+        #                         subj_doc = subjectsCollection.find_one({"_id": subject_code})
+        #                         subj_desc = subj_doc["Description"] if subj_doc else "Unknown"
+
+        #                         records.append({
+        #                             "StudentID": student_id,
+        #                             "StudentName": student_name,
+        #                             "SubjectCode": subject_code,
+        #                             "SubjectDescription": subj_desc,
+        #                             "Teacher": teacher,
+        #                             "Grade": grade,
+        #                             "SemesterID": semester_id
+        #                         })
+
+        #                 # CASE 3: Only Teacher filter applied
+        #                 elif filter_teacher and teacher_name:
+        #                     for i, teacher in enumerate(teachers):
+        #                         if teacher == teacher_name:
+        #                             subj_code = subject_codes[i] if i < len(subject_codes) else None
+        #                             grade = grades[i] if i < len(grades) else None
+        #                             subj_doc = subjectsCollection.find_one({"_id": subj_code})
+        #                             subj_desc = subj_doc["Description"] if subj_doc else "Unknown"
+
+        #                             records.append({
+        #                                 "StudentID": student_id,
+        #                                 "StudentName": student_name,
+        #                                 "SubjectCode": subj_code,
+        #                                 "SubjectDescription": subj_desc,
+        #                                 "Teacher": teacher,
+        #                                 "Grade": grade,
+        #                                 "SemesterID": semester_id
+        #                             })
+
+        #                 # CASE 4: No subject/teacher filter → show all
+        #                 else:
+        #                     for i, subj_code in enumerate(subject_codes):
+        #                         grade = grades[i] if i < len(grades) else None
+        #                         teacher = teachers[i] if i < len(teachers) else None
+        #                         subj_doc = subjectsCollection.find_one({"_id": subj_code})
+        #                         subj_desc = subj_doc["Description"] if subj_doc else "Unknown"
+
+        #                         records.append({
+        #                             "StudentID": student_id,
+        #                             "StudentName": student_name,
+        #                             "SubjectCode": subj_code,
+        #                             "SubjectDescription": subj_desc,
+        #                             "Teacher": teacher,
+        #                             "Grade": grade,
+        #                             "SemesterID": semester_id
+        #                         })
+
+                                
+        #             df = pd.DataFrame(records)
+
+        #             if df.empty:
+        #                 st.warning("⚠️ No records found.")
+        #             else:
+        #                 st.dataframe(df)
 
 
 
