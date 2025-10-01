@@ -607,12 +607,24 @@ if not st.session_state.authenticated:
         # Input: Teacher name
         # -------------------------------
         # Extract teacher names (flattened list)
-        teacher_list = []
-        for doc in gradesCollection.find({}, {"Teachers": 1}):
-            teacher_list.extend(doc.get("Teachers", []))
-        teacher_list = sorted(set(teacher_list))
+        # teacher_list = []
+        # for doc in gradesCollection.find({}, {"Teachers": 1}):
+        #     teacher_list.extend(doc.get("Teachers", []))
+        # teacher_list = sorted(set(teacher_list))
 
-        session_teacher = st.selectbox("Select Teacher", teacher_list)
+        # session_teacher = st.selectbox("Select Teacher", teacher_list)
+
+        try:
+            # Use distinct to fetch unique teacher names directly
+            teacher_list = gradesCollection.distinct("Teachers")
+            teacher_list = sorted(filter(None, teacher_list))  # remove None values and sort
+
+            session_teacher = st.selectbox("Select Teacher", teacher_list)
+
+        except Exception as e:
+            st.error(f"Error loading teacher list: {e}")
+            session_teacher = None
+
 
         #username = st.text_input("Username")
         password = st.text_input("Password", type="password")
