@@ -117,7 +117,7 @@ def df_to_pdf(dataframe, title="Grade Distribution Report", subtitle=None):
     # Styling
     style = TableStyle([
         # ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1976d2")),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.aliceblue),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.black),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
