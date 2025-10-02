@@ -1800,13 +1800,20 @@ else:
         if not subjects:
             st.warning("⚠️ No subjects found for this teacher.")
         else:
-            subject_map = {s["Description"]: s["_id"] for s in subjects}
-            selected_desc = st.selectbox("Select Subject", list(subject_map.keys()))
-            selected_subject = subject_map[selected_desc]   # use _id in pipeline
 
-            # ✅ Step 2: Student filter (optional)
-            student_ids = studentsCollection.distinct("_id")
-            selected_student = st.selectbox("Filter by StudentID (optional)", ["All"] + student_ids)
+            col1, col2 = st.columns(2)
+            with col1:
+                subject_map = {s["Description"]: s["_id"] for s in subjects}
+                selected_desc = st.selectbox("Select Subject", list(subject_map.keys()))
+                selected_subject = subject_map[selected_desc]   # use _id in pipeline
+
+            with col2:
+                # ✅ Step 2: Student filter (optional)
+                student_ids = studentsCollection.distinct("_id")
+                selected_student = st.selectbox("Filter by StudentID (optional)", ["All"] + student_ids)
+            
+            
+            
 
             # -------------------------
             # Build aggregation pipeline
@@ -1896,7 +1903,8 @@ else:
             # -------------------------
             # Run query and display
             # -------------------------
-            df = pd.DataFrame(list(gradesCollection.aggregate(pipeline)))
+            with st.spinner("⏳ Fetching data. One moment please..."):
+                df = pd.DataFrame(list(gradesCollection.aggregate(pipeline)))
 
             if df.empty:
                 st.info("✅ No failing or missing grades for this filter.")
@@ -1913,8 +1921,8 @@ else:
                     "Grade"
                 ]
                 df = df[column_order]
-
-                st.dataframe(df)
+                with st.spinner("⏳ Rendering results..."):
+                    st.dataframe(df)
 
                 # CSV export
                 csv = df.to_csv(index=False).encode("utf-8")
