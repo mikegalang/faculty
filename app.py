@@ -646,7 +646,7 @@ else:
     #st.toast(f"It is good to see you, {st.session_state.session_teacher}!", icon="😍")
 
     client = get_mongo_client()
-    db = client["mit261n"]  
+    db = client["mit261n_new"]  
     subjectsCollection = db["new_subjects"]  
     studentsCollection = db["new_students"]  
     semestersCollection = db["new_semesters"]  
