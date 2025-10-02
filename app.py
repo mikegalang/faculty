@@ -265,7 +265,6 @@ def generate_pdf_intervention(df, teacher_name):
         col_widths = [page_width / num_cols] * num_cols
 
         col_widths = [50, 100, 80, 100, 50, 50, 100]  # widths in points for each column
-        #table = Table(data, repeatRows=1, colWidths=col_widths)
 
         # Create table
         table = Table(data, repeatRows=1, colWidths=col_widths)
@@ -438,15 +437,12 @@ def faculty_get_teacher_subjects_with_semester(teacher_name: str):
     return list(gradesCollection.aggregate(pipeline))
 
 def faculty_get_student_grades_by_subject_teacher(subject_code, teacher_name, semester_id):
-    #st.write(f"{subject_code} --- {teacher_name} --- {semester_id}")
     pipeline = [
         {
             "$match": {
                 "SubjectCodes": subject_code,
                 "Teachers": teacher_name,
                 "SemesterID": semester_id
-
-
             }
         },
         {
@@ -487,14 +483,10 @@ def faculty_get_student_grades_by_subject_teacher(subject_code, teacher_name, se
 
     results =pd.DataFrame(gradesCollection.aggregate(pipeline))
 
-    # results['Status'] = np.where(results['Grade'] >= 75, 'Pass', 'Fail')
-
     if "Grade" not in results.columns:
         results["Grade"] = None
 
     # Convert to numeric (invalid → NaN)
-    #results["Grade"] = pd.to_numeric(results["Grade"], errors="coerce")
-
     conditions = [
         results["Grade"].isna(),             # Grade is NaN / empty
         results["Grade"] >= 75,              # Passing grade
@@ -508,15 +500,6 @@ def faculty_get_student_grades_by_subject_teacher(subject_code, teacher_name, se
     ]
 
     results["Status"] = np.select(conditions, choices, default="Missing Grade")
-    #results["Grade"] = results["Grade"].where(~results["Grade"].isna(), "")
-
-    # results["Grade"] = pd.to_numeric(results["Grade"], errors="coerce")
-
-    # # Format only non-NaN values
-    # results["Grade"] = results["Grade"].apply(
-    #     lambda x: f"{x:.2f}" if pd.notna(x) else x
-    # )
-
     
     return results
 
@@ -551,7 +534,6 @@ def render_bar_graph_passing_count():
     graph2Data = studentList['Status'].value_counts().reset_index()
     graph2Data.columns = ['Status', 'count']
 
-    #st.write(graph1Data)
     # Plot the bar chart
     # Define colors by status
     colors = graph2Data['Status'].map({
@@ -578,7 +560,7 @@ def render_bar_graph_passing_count():
 
 
 ####################################################################
-######## MAIN APP
+#      MAIN APP
 ####################################################################
 # Page Config
 st.set_page_config(layout="wide", page_title="Faculty Module")
@@ -599,21 +581,13 @@ if not st.session_state.authenticated:
     with st.form("login_form"):
 
         client = get_mongo_client()
-        db = client["mit261n"]  
+        db = client["mit261n_new"]  
         gradesCollection = db["new_grades"]
 
 
         # -------------------------------
         # Input: Teacher name
         # -------------------------------
-        # Extract teacher names (flattened list)
-        # teacher_list = []
-        # for doc in gradesCollection.find({}, {"Teachers": 1}):
-        #     teacher_list.extend(doc.get("Teachers", []))
-        # teacher_list = sorted(set(teacher_list))
-
-        # session_teacher = st.selectbox("Select Teacher", teacher_list)
-
         try:
             # Use distinct to fetch unique teacher names directly
             teacher_list = gradesCollection.distinct("Teachers")
@@ -643,8 +617,6 @@ if not st.session_state.authenticated:
 else:
     st.title(f"Welcome, {st.session_state.session_teacher}!")
 
-    #st.toast(f"It is good to see you, {st.session_state.session_teacher}!", icon="😍")
-
     client = get_mongo_client()
     db = client["mit261n_new"]  
     subjectsCollection = db["new_subjects"]  
@@ -663,22 +635,19 @@ else:
         "Student Grade Analytics",
         "Logout"
         ]
-    # Insert containers separated into tabs:
-    #active_tab = st.tabs(tabs)
+    
     selected_tab = st.session_state.get("active_tab", 0)
 
     tab_index = st.radio("📌 Navigate:", tabs, index=selected_tab, horizontal=True, label_visibility="collapsed")
-    #st.session_state.active_tab = tabs.index(tab_index)
-
-
-    # You can also use "with" notation:
-    #with tab_home:
+   
+    ##################################
+    # Home
+    ##################################
     if tab_index == "Home":
 
         # Bottom-aligned columns
         col1, col2 = st.columns(2)
 
-        # You can also use "with" notation:
         with col2:
             st.subheader("My Subjects")
             teacher_name = st.session_state.session_teacher
@@ -688,17 +657,13 @@ else:
 
             if results:
                 df = pd.DataFrame(results)
-                # Rename Mongo _id to SubjectCode for clarity
                 df = df.rename(columns={"_id": "SubjectCode"})
-                #st.success(f"✅ Found {len(df)} subject(s) for teacher: {teacher_name}")
-                st.dataframe(df, use_container_width=True)
-                
+                st.dataframe(df, use_container_width=True)        
             else:
                 st.warning("⚠️ No subjects found for that teacher.")
 
         with col1:
             st.subheader("Semesters List")
-
             results = list(
                 semestersCollection.find(
                     {}, {"_id": 1, "Semester": 1, "SchoolYear": 1}
@@ -712,13 +677,10 @@ else:
             else:
                 st.warning("⚠️ No semesters found in the database.")
             
-        
-        
-            
-
-    #with tab_class_grade_distribution:
+    ##################################
+    # Class Grade Distribution
+    ##################################
     elif tab_index == "Class Grade Distribution":
-        #st.write("tab_class_grade_distribution")
         st.subheader("Class Grade Distribution")
             
         #teachers = gradesCollection.distinct("Teachers")
@@ -730,29 +692,21 @@ else:
         semester_labels = [f'{s["SchoolYear"]} - {s["Semester"]}' for s in semesters]
         sem_map = {f'{s["SchoolYear"]} - {s["Semester"]}': s["_id"] for s in semesters}
 
-
         # display the controls
         col1, col2 = st.columns(2)
         with col1:
-            #teacher_input = st.selectbox("Select Teacher", teachers)
-            #semester_input = st.selectbox("Select Semester", semesters)
-
             semester_input_desc = st.selectbox("📅 Select Semester", semester_labels)
             semester_input = sem_map[semester_input_desc]
-
             
         with col2:          
             teacher_input = st.session_state.session_teacher
             
-
         if teacher_input and semester_input:
             # Query Grades collection
             data = list(gradesCollection.find({
                 "Teachers": teacher_input,
                 "SemesterID": semester_input
             }))
-
-            #st.table(data)
 
             # Normalize arrays into rows
             records = []
@@ -773,8 +727,7 @@ else:
                         })
                     
             df = pd.DataFrame(records)
-            #st.table(df)
-
+            
             if df.empty:
                 st.warning("⚠️ No records found for the selected teacher and semester.")
             else:
@@ -783,7 +736,6 @@ else:
                 for subj in subjectsCollection.find({}):
                     subj_map[subj["_id"]] = subj.get("Description", "")
 
-                #df["Description"] = df["SubjectCodes"].map(subj_map)
                 df["SubjectDescription"] = df["SubjectCode"].map(subj_map)
 
                 # Define bins
@@ -884,19 +836,17 @@ else:
                     mime="application/pdf",
                 )
 
-
-    #with tab_student_progress_tracker:
+    ##################################
+    # Student Progress Tracker
+    ##################################
     elif tab_index == "Student Progress Tracker":
 
         selected_teacher = st.session_state.session_teacher
                 
         # Input filters
-        #filter_type = st.radio("Filter by:", ["Subject", "Course", "YearLevel", "Student ID"])
         filter_type = st.radio("Filter by:", ["YearLevel", "Student ID"])
 
-        if filter_type == "Subject":
-            #subjects = subjectsCollection.distinct("Description")
-            
+        if filter_type == "Subject":        
             subjects = sorted(subjectsCollection.distinct("Description", {"Teacher": selected_teacher}))
             selected_value = st.selectbox("Select Subject", subjects)
 
@@ -1103,7 +1053,6 @@ else:
                     {"$sort": {"StudentID": 1}}
                 ]
 
-
                 st.subheader("📑 Progress Tracker by Year / Level")
                 with st.spinner("Loading data..."):
                     data = list(gradesCollection.aggregate(pipeline))
@@ -1305,14 +1254,9 @@ else:
                     except ValueError:
                         st.error("❌ Please enter a valid numeric Student ID.")
 
-
-
-
-
             student_filter = {}
             student_map = {s["_id"]: s for s in studentsCollection.find(student_filter)}
                 
-
             if filter_type == "Subject":
                 
                 subj_doc = subjectsCollection.find_one({"Description": selected_value})
@@ -1443,11 +1387,9 @@ else:
                     st.subheader("📑 Student Grade Trends by Semester")
                     st.dataframe(result)
                     
-
-
-
-
-    #with tab_subject_difficulty_heatmap:
+    ##################################
+    # Subject Difficulty Heatmap
+    ##################################
     elif tab_index == "Subject Difficulty Heatmap":
         
         teacher_input = st.session_state.session_teacher
@@ -1500,8 +1442,6 @@ else:
                 # -------------------------------
                 df["Success"] = df["Grade"].apply(lambda x: 1 if (x is not None and x >= 75) else 0)
                 df["Fail"] = df["Grade"].apply(lambda x: 1 if (x is not None and x < 75) else 0)
-                #df["Dropout"] = df["Grade"].apply(lambda x: 1 if x is None else 0)
-                #df["Dropout"] = df["Grade"].apply(lambda g: sum(pd.isnull(x) for x in g)).sum()
                 df["Dropout"] = df["Success"] - df["Fail"]
 
                 summary = df.groupby(["CourseCode", "CourseDescription"]).agg(
@@ -1551,12 +1491,10 @@ else:
                     file_name=f"performance_summary_{teacher_input}.pdf",
                     mime="application/pdf"
                 )
-                
 
-
-
-
-
+    ##################################
+    # Intervention Candidates List
+    ##################################
     elif tab_index == "Intervention Candidates List":
         
         teacher_input = st.session_state.session_teacher
@@ -1638,10 +1576,9 @@ else:
                         mime="application/pdf"
                     )
 
-
-
-
-
+    ##################################
+    # Grade Submission Status
+    ##################################
     elif tab_index == "Grade Submission Status":
 
         selected_teacher = st.session_state.session_teacher
@@ -1758,12 +1695,10 @@ else:
                 else:
                     st.info("⚠️ No records found for this teacher.")
 
-    
-
-
-
+    ##################################
+    # Custom Query Builder
+    ##################################
     elif tab_index == "Custom Query Builder":
-     
        
         selected_teacher = st.session_state.session_teacher
 
@@ -1788,9 +1723,6 @@ else:
                 student_ids = studentsCollection.distinct("_id")
                 selected_student = st.selectbox("Filter by StudentID (optional)", ["All"] + student_ids)
             
-            
-            
-
             # -------------------------
             # Build aggregation pipeline
             # -------------------------
@@ -1802,7 +1734,6 @@ else:
                 match_stage["StudentID"] = selected_student
 
             st.subheader(f"📊 Students with Low Grades in {selected_subject}")
-
 
             pipeline = [
                 {"$match": match_stage},
@@ -1904,139 +1835,10 @@ else:
                 csv = df.to_csv(index=False).encode("utf-8")
                 st.download_button("⬇️ Download CSV", csv, "failing_grades.csv", "text/csv")
 
-        # selected_teacher = st.session_state.session_teacher
-
-        # # ✅ Step 1: Build subject dropdown (Description shown, _id used internally)
-        # subjects = list(subjectsCollection.find(
-        #     {"Teacher": selected_teacher},
-        #     {"_id": 1, "Description": 1}
-        # ))
-
-        # if not subjects:
-        #     st.warning("⚠️ No subjects found for this teacher.")
-        # else:
-
-        #     subject_map = {s["Description"]: s["_id"] for s in subjects}
-        #     selected_desc = st.selectbox("Select Subject", list(subject_map.keys()))
-        #     selected_subject = subject_map[selected_desc]   # use _id in pipeline
-
-        #     st.subheader(f"📊 Students with Low Grades in {selected_subject}")
-
-        #     if selected_subject and selected_teacher:
-        #         pipeline = [
-        #             {
-        #                 "$match": {
-        #                     "SubjectCodes": selected_subject,
-        #                     "Teachers": selected_teacher
-        #                 }
-        #             },
-        #             {
-        #                 "$project": {
-        #                     "StudentID": 1,
-        #                     "SubjectIndex": {
-        #                         "$indexOfArray": ["$SubjectCodes", selected_subject]
-        #                     },
-        #                     "Grades": 1,
-        #                     "Teachers": 1,
-        #                     "SemesterID": 1,
-        #                     "SubjectCodes": 1
-        #                 }
-        #             },
-        #             {
-        #                 "$project": {
-        #                     "StudentID": 1,
-        #                     "SemesterID": 1,
-        #                     "SubjectCode": {
-        #                         "$arrayElemAt": ["$SubjectCodes", "$SubjectIndex"]
-        #                     },
-        #                     "Teacher": {
-        #                         "$arrayElemAt": ["$Teachers", "$SubjectIndex"]
-        #                     },
-        #                     "Grade": {
-        #                         "$arrayElemAt": ["$Grades", "$SubjectIndex"]
-        #                     }
-        #                 }
-        #             },
-        #             {
-        #                 "$lookup": {
-        #                     "from": "new_students",
-        #                     "localField": "StudentID",
-        #                     "foreignField": "_id",
-        #                     "as": "student_info"
-        #                 }
-        #             },
-        #             {"$unwind": "$student_info"},
-        #             {
-        #                 "$lookup": {
-        #                     "from": "new_semesters",
-        #                     "localField": "SemesterID",
-        #                     "foreignField": "_id",
-        #                     "as": "sem_info"
-        #                 }
-        #             },
-        #             {"$unwind": "$sem_info"},
-        #             {
-        #                 "$lookup": {
-        #                     "from": "new_subjects",
-        #                     "localField": "SubjectCode",
-        #                     "foreignField": "_id",
-        #                     "as": "subject_info"
-        #                 }
-        #             },
-        #             {"$unwind": "$subject_info"},
-        #             {
-        #                 "$project": {
-        #                     "_id": 0,
-        #                     "StudentID": 1,
-        #                     "Name": "$student_info.Name",
-        #                     "Semester": "$sem_info.Semester",
-        #                     "SchoolYear": "$sem_info.SchoolYear",
-        #                     "SubjectCode": "$SubjectCode",
-        #                     "SubjectDescription": "$subject_info.Description",
-        #                     "Teacher": 1,
-        #                     "Grade": 1
-        #                 }
-        #             },
-        #             {
-        #                 "$match": {
-        #                     "$or": [
-        #                         {"Grade": {"$lt": 75}}
-        #                     ]
-        #                 }
-        #             }
-        #         ]
-
-        #         # Run pipeline
-        #         df = pd.DataFrame(list(gradesCollection.aggregate(pipeline)))
-
-        #         if df.empty:
-        #             st.info("✅ No failing or missing grades for this Subject & Teacher.")
-        #         else:
-        #             # ✅ Reorder columns (no Status column)
-        #             column_order = [
-        #                 "StudentID",
-        #                 "Name",
-        #                 "SubjectCode",
-        #                 "SubjectDescription",
-        #                 "Teacher",
-        #                 "Semester",
-        #                 "SchoolYear",
-        #                 "Grade"
-        #             ]
-        #             df = df[column_order]
-
-        #             st.dataframe(df)
-
-        #             # Download option
-        #             csv = df.to_csv(index=False).encode("utf-8")
-        #             st.download_button("⬇️ Download CSV", csv, "failing_grades.csv", "text/csv")
-
-
-
-
+    ##################################
+    # Student Grade Analytics
+    ##################################
     elif tab_index == "Student Grade Analytics":
-        
-        
         teacher_name = st.session_state.session_teacher
 
         if teacher_name:
@@ -2082,11 +1884,7 @@ else:
 
                     if semester_obj:
                         semester_id = semester_obj["_id"]
-                        #st.write(f"Found Semester ID: {semester_id}")
-                    #else:
-                        #st.warning(f"No semester found for {selectSemester} - {selectSchoolYear}")
-                                
-                    #st.success(f"Semester = {selectSemester}; Year = {selectSchoolYear  }")
+                        
                 
                 studentList = faculty_get_student_grades_by_subject_teacher(selectSubjectCode, teacher_name, semester_id)
 
@@ -2123,8 +1921,9 @@ else:
                     # result set for graph2
                     render_bar_graph_passing_count()
 
-
-
+    ##################################
+    # Logout
+    ##################################
     elif tab_index == "Logout":
         if st.button("Logout"):
             st.session_state.authenticated = False
