@@ -1621,87 +1621,123 @@ else:
     elif tab_index == "Grade Submission Status":
         #st.write("tab_grade_submission_status")
 
-        teacher_input = st.session_state.session_teacher
+        #teacher_input = st.session_state.session_teacher
 
-        if teacher_input:
-            # -------------------------------
-            # Query Grades for selected teacher
-            # -------------------------------
-            data = list(gradesCollection.find({"Teachers": teacher_input}))
+        selected_teacher = st.session_state.session_teacher
 
-            records = []
-            for doc in data:
-                student_id = doc.get("StudentID")
-                subject_codes = doc.get("SubjectCodes", [])
-                grades = doc.get("Grades", [])
-                teachers = doc.get("Teachers", [])
+        if selected_teacher:
+            pipeline = [
+                # Step 1: Unwind arrays so each subject-grade-teacher aligns
+                {"$unwind": {"path": "$SubjectCodes", "includeArrayIndex": "idx"}},
 
-                for i in range(len(subject_codes)):
-                    if teachers[i] == teacher_input:  # Only subjects taught by this teacher
-                        records.append({
-                            "StudentID": student_id,
-                            "SubjectCode": subject_codes[i],
-                            "Grade": grades[i] if i < len(grades) else None,
-                            "SemesterID": doc.get("SemesterID") 
-                        })
+                # Step 2: Align Grade and Teacher with subject index
+                {
+                    "$project": {
+                        "StudentID": 1,
+                        "SemesterID": 1,
+                        "SubjectCode": "$SubjectCodes",
+                        "Grade": {"$arrayElemAt": ["$Grades", "$idx"]},
+                        "Teacher": {"$arrayElemAt": ["$Teachers", "$idx"]}
+                    }
+                },
 
-            df = pd.DataFrame(records)
+                # Step 3: Filter only records handled by selected teacher
+                {"$match": {"Teacher": selected_teacher}},
 
-            if df.empty:
-                st.warning("⚠️ No student records found for this teacher.")
-            else:
-                # -------------------------------
-                # Map subject descriptions
-                # -------------------------------
-                subj_map = {s["_id"]: s.get("Description", "") for s in subjectsCollection.find({})}
-                df["SubjectDescription"] = df["SubjectCode"].map(subj_map)
+                # Step 4: Join with subject descriptions
+                {
+                    "$lookup": {
+                        "from": "new_subjects",
+                        "localField": "SubjectCode",
+                        "foreignField": "_id",
+                        "as": "SubjectInfo"
+                    }
+                },
+                {"$unwind": "$SubjectInfo"},
 
-                # -------------------------------
-                # Submission stats
-                # -------------------------------
-                #df["Submitted"] = df["Grade"].apply(lambda x: 1 if x is not None else 0)
-                df["Submitted"] = df["Grade"].apply(
-                    lambda x: 1 if pd.notnull(x) and x != "" else 0
-                )
+                # Step 5: Mark whether grade is submitted
+                {
+                    "$addFields": {
+                        "isSubmitted": {
+                            "$cond": [
+                                {"$or": [{"$eq": ["$Grade", None]}, {"$eq": ["$Grade", ""]}]},
+                                0,
+                                1
+                            ]
+                        }
+                    }
+                },
 
-                summary = df.groupby(
-                    ["SemesterID", "SubjectCode", "SubjectDescription"]
-                ).agg(
-                    TotalStudents=("StudentID", "count"),
-                    SubmittedGrades=("Submitted", "sum")
-                ).reset_index()
+                # Step 6: Group by Subject and Semester
+                {
+                    "$group": {
+                        "_id": {
+                            "SubjectCode": "$SubjectCode",
+                            "SubjectDescription": "$SubjectInfo.Description",
+                            "SemesterID": "$SemesterID"
+                        },
+                        "SubmittedGrades": {"$sum": "$isSubmitted"},
+                        "NoGrades": {"$sum": {"$cond": [{"$eq": ["$isSubmitted", 0]}, 1, 0]}},
+                        "TotalStudents": {"$sum": 1}
+                    }
+                },
 
-                summary["NoGrades"] = summary["TotalStudents"] - summary["SubmittedGrades"]
+                # Step 7: Compute submission rate
+                {
+                    "$addFields": {
+                        "SubmissionRate": {
+                            "$round": [
+                                {"$multiply": [{"$divide": ["$SubmittedGrades", "$TotalStudents"]}, 100]},
+                                2
+                            ]
+                        }
+                    }
+                },
 
-                summary["SubmissionRate (%)"] = (summary["SubmittedGrades"] / summary["TotalStudents"] * 100).round(2)
+                # Step 8: Flatten fields
+                {
+                    "$project": {
+                        "_id": 0,
+                        "SubjectCode": "$_id.SubjectCode",
+                        "SubjectDescription": "$_id.SubjectDescription",
+                        "SubmittedGrades": 1,
+                        "NoGrades": 1,
+                        "TotalStudents": 1,
+                        "SubmissionRate": 1,
+                        "SemesterID": "$_id.SemesterID"
+                    }
+                },
 
-                # -------------------------------
-                # Final table
-                # -------------------------------
-                # result = summary[[
-                #     "SubjectCode", "SubjectDescription", "SemesterID", "SubmittedGrades", "TotalStudents", "SubmissionRate (%)"
-                # ]]
-                result = summary[[
-                    "SemesterID", "SubjectCode", "SubjectDescription",
-                    "SubmittedGrades", "NoGrades", "TotalStudents", "SubmissionRate (%)"
-                ]]
+                # Step 9: Sort results
+                {"$sort": {"SemesterID": 1, "SubjectCode": 1}}
+            ]
 
-                st.subheader(f"📑 Grade Submission Summary for {teacher_input}")
-                st.dataframe(result)
+            with st.spinner(f"⏳ Fetching data for {selected_teacher}. One moment please..."):
+                # Run aggregation
+                data = list(gradesCollection.aggregate(pipeline))
 
-                st.info("Page shows list of subjects, under the selected teacher, together with its submission rate. Teacher may need to revisit subjects with high number of no grades or submission rate not reaching 100%.")
+                if data:
+                    df = pd.DataFrame(data)
+                    column_order = [
+                        "SemesterID",
+                        "SubjectCode",
+                        "SubjectDescription",
+                        "SubmittedGrades",
+                        "NoGrades",
+                        "TotalStudents",
+                        "SubmissionRate"
+                    ]
+                    df = df[column_order]
 
-                if not result.empty:
-                    pdf_buffer = generate_pdf_submission(result, teacher_input)
-                    st.download_button(
-                        label="📥 Download Grade Submission Report (PDF)",
-                        data=pdf_buffer,
-                        file_name=f"grade_submission_{teacher_input}.pdf",
-                        mime="application/pdf"
-                    )
+                    st.dataframe(df)
 
+                    # Download option
+                    csv = df.to_csv(index=False).encode("utf-8")
+                    st.download_button("⬇️ Download CSV", csv, "teacher_grade_submission_report.csv", "text/csv")
+                else:
+                    st.info("⚠️ No records found for this teacher.")
 
-
+    
 
 
 
