@@ -1128,162 +1128,186 @@ else:
                         st.warning("⚠️ No records found for this subject.")
             
             if filter_type == "Student ID":
-                student_id = int(selected_value)   # <-- parameter
+                student_id_input = int(selected_value)   # <-- parameter
             
-                pipeline = [
-                    # Step 1: Filter by StudentID
-                    {"$match": {"StudentID": student_id}},
+                if student_id_input:
+                    try:
+                        student_id = int(student_id_input)
 
-                    # Step 2: Join with students
-                    {
-                        "$lookup": {
-                            "from": "new_students",
-                            "localField": "StudentID",
-                            "foreignField": "_id",   # adjust if it's actually "_id"
-                            "as": "StudentInfo"
-                        }
-                    },
-                    {"$unwind": "$StudentInfo"},
+                        pipeline = [
+                            # Step 1: Filter by StudentID
+                            {"$match": {"StudentID": student_id}},
 
-                    # Step 3: Unwind arrays
-                    {"$unwind": {"path": "$SubjectCodes", "includeArrayIndex": "idx"}},
-
-                    # Step 4: Project aligned Grade
-                    {
-                        "$project": {
-                            "StudentID": 1,
-                            "SemesterID": 1,
-                            "SubjectCode": "$SubjectCodes",
-                            "Grade": {"$arrayElemAt": ["$Grades", "$idx"]},
-                            "Name": "$StudentInfo.Name"
-                        }
-                    },
-
-                    # Step 5: Join with subjects
-                    {
-                        "$lookup": {
-                            "from": "new_subjects",
-                            "localField": "SubjectCode",
-                            "foreignField": "_id",
-                            "as": "SubjectInfo"
-                        }
-                    },
-                    {"$unwind": "$SubjectInfo"},
-
-                    # Step 6: Join with semesters
-                    {
-                        "$lookup": {
-                            "from": "new_semesters",
-                            "localField": "SemesterID",
-                            "foreignField": "_id",
-                            "as": "SemesterInfo"
-                        }
-                    },
-                    {"$unwind": {"path": "$SemesterInfo", "preserveNullAndEmptyArrays": True}},
-
-                    # Step 7: Convert raw % → GPA points
-                    {
-                        "$addFields": {
-                            "GPApoint": {
-                                "$switch": {
-                                    "branches": [
-                                        {"case": {"$gte": ["$Grade", 97]}, "then": 4.0},
-                                        {"case": {"$gte": ["$Grade", 93]}, "then": 4.0},
-                                        {"case": {"$gte": ["$Grade", 90]}, "then": 3.7},
-                                        {"case": {"$gte": ["$Grade", 87]}, "then": 3.3},
-                                        {"case": {"$gte": ["$Grade", 83]}, "then": 3.0},
-                                        {"case": {"$gte": ["$Grade", 80]}, "then": 2.7},
-                                        {"case": {"$gte": ["$Grade", 77]}, "then": 2.3},
-                                        {"case": {"$gte": ["$Grade", 73]}, "then": 2.0},
-                                        {"case": {"$gte": ["$Grade", 70]}, "then": 1.7},
-                                        {"case": {"$gte": ["$Grade", 67]}, "then": 1.3},
-                                        {"case": {"$gte": ["$Grade", 65]}, "then": 1.0}
-                                    ],
-                                    "default": 0.0
+                            # Step 2: Join with students
+                            {
+                                "$lookup": {
+                                    "from": "new_students",
+                                    "localField": "StudentID",
+                                    "foreignField": "_id",
+                                    "as": "StudentInfo"
                                 }
                             },
-                            "Units": "$SubjectInfo.Units"
-                        }
-                    },
+                            {"$unwind": "$StudentInfo"},
 
-                    # Step 8: Add weighted GPA contribution
-                    {
-                        "$addFields": {
-                            "weightedGrade": {"$multiply": ["$GPApoint", "$Units"]}
-                        }
-                    },
+                            # Step 3: Unwind arrays
+                            {"$unwind": {"path": "$SubjectCodes", "includeArrayIndex": "idx"}},
 
-                    # Step 9: Compute Semester GPA
-                    {
-                        "$group": {
-                            "_id": {
-                                "StudentID": "$StudentID",
-                                "SemesterID": "$SemesterID",
-                                "SemesterName": "$SemesterInfo.SemesterName",
-                                "SchoolYear": "$SemesterInfo.SchoolYear",
-                                "Name": "$Name"
-                            },
-                            "totalWeighted": {"$sum": "$weightedGrade"},
-                            "totalUnits": {"$sum": "$Units"},
-                            "subjects": {
-                                "$push": {
-                                    "Units": "$Units",
-                                    "Grade": "$Grade",
-                                    "GPApoint": "$GPApoint"
+                            # Step 4: Align Grades
+                            {
+                                "$project": {
+                                    "StudentID": 1,
+                                    "SemesterID": 1,
+                                    "SubjectCode": "$SubjectCodes",
+                                    "Grade": {"$arrayElemAt": ["$Grades", "$idx"]},
+                                    "Name": "$StudentInfo.Name"
                                 }
-                            }
-                        }
-                    },
-                    {
-                        "$project": {
-                            "_id": 0,
-                            "StudentID": "$_id.StudentID",
-                            "Name": "$_id.Name",
-                            "SemesterID": "$_id.SemesterID",
-                            "SemesterName": "$_id.SemesterName",
-                            "SchoolYear": "$_id.SchoolYear",
-                            "SemesterGPA": {"$round": [{"$divide": ["$totalWeighted", "$totalUnits"]}, 2]},
-                            "subjects": 1
-                        }
-                    },
+                            },
 
-                    # Step 10: Unwind subjects back to rows
-                    {"$unwind": "$subjects"},
-                    {
-                        "$project": {
-                            "StudentID": 1,
-                            "Name": 1,
-                            "SemesterID": 1,
-                            "SemesterName": 1,
-                            "SchoolYear": 1,
-                            "Units": "$subjects.Units",
-                            "Grade": "$subjects.Grade",
-                            "SemesterGPA": 1
-                        }
-                    },
+                            # Step 5: Join with subjects
+                            {
+                                "$lookup": {
+                                    "from": "new_subjects",
+                                    "localField": "SubjectCode",
+                                    "foreignField": "_id",
+                                    "as": "SubjectInfo"
+                                }
+                            },
+                            {"$unwind": "$SubjectInfo"},
 
-                    {"$sort": {"SemesterID": 1}}
-                ]
+                            # Step 6: Join with semesters
+                            {
+                                "$lookup": {
+                                    "from": "new_semesters",
+                                    "localField": "SemesterID",
+                                    "foreignField": "_id",
+                                    "as": "SemesterInfo"
+                                }
+                            },
+                            {"$unwind": {"path": "$SemesterInfo", "preserveNullAndEmptyArrays": True}},
 
-                with st.spinner("Loading data..."):
-                    results = list(gradesCollection.aggregate(pipeline))
+                            # Step 7: Convert raw % → GPA points
+                            {
+                                "$addFields": {
+                                    "GPApoint": {
+                                        "$switch": {
+                                            "branches": [
+                                                {"case": {"$gte": ["$Grade", 97]}, "then": 4.0},
+                                                {"case": {"$gte": ["$Grade", 93]}, "then": 4.0},
+                                                {"case": {"$gte": ["$Grade", 90]}, "then": 3.7},
+                                                {"case": {"$gte": ["$Grade", 87]}, "then": 3.3},
+                                                {"case": {"$gte": ["$Grade", 83]}, "then": 3.0},
+                                                {"case": {"$gte": ["$Grade", 80]}, "then": 2.7},
+                                                {"case": {"$gte": ["$Grade", 77]}, "then": 2.3},
+                                                {"case": {"$gte": ["$Grade", 73]}, "then": 2.0},
+                                                {"case": {"$gte": ["$Grade", 70]}, "then": 1.7},
+                                                {"case": {"$gte": ["$Grade", 67]}, "then": 1.3},
+                                                {"case": {"$gte": ["$Grade", 65]}, "then": 1.0}
+                                            ],
+                                            "default": 0.0
+                                        }
+                                    },
+                                    "Units": "$SubjectInfo.Units",
+                                    "SubjectDescription": "$SubjectInfo.Description",
+                                    "Semester": "$SemesterInfo.Semester",
+                                    "SchoolYear": "$SemesterInfo.SchoolYear"
+                                }
+                            },
 
-                    st.subheader("📑 Progress Tracker by Student ID")
+                            # Step 8: Weighted grade
+                            {
+                                "$addFields": {
+                                    "weightedGrade": {"$multiply": ["$GPApoint", "$Units"]}
+                                }
+                            },
 
-                    import pandas as pd
-                    df = pd.DataFrame(results, columns=[
-                        "StudentID", "Name", "SemesterID", "SchoolYear", "Units", "Grade", "SemesterGPA"
-                    ])
-                    st.dataframe(df)
+                            # Step 9: Group by Semester
+                            {
+                                "$group": {
+                                    "_id": {
+                                        "StudentID": "$StudentID",
+                                        "SemesterID": "$SemesterID",
+                                        "Semester": "$Semester",
+                                        "SchoolYear": "$SchoolYear",
+                                        "Name": "$Name"
+                                    },
+                                    "totalWeighted": {"$sum": "$weightedGrade"},
+                                    "totalUnits": {"$sum": "$Units"},
+                                    "subjects": {
+                                        "$push": {
+                                            "SubjectCode": "$SubjectCode",
+                                            "SubjectDescription": "$SubjectDescription",
+                                            "Units": "$Units",
+                                            "Grade": "$Grade",
+                                            "GPApoint": "$GPApoint"
+                                        }
+                                    }
+                                }
+                            },
 
-                    csv = df.to_csv(index=False).encode("utf-8")
+                            # Step 10: Compute GPA
+                            {
+                                "$project": {
+                                    "_id": 0,
+                                    "StudentID": "$_id.StudentID",
+                                    "Name": "$_id.Name",
+                                    "SemesterID": "$_id.SemesterID",
+                                    "Semester": "$_id.Semester",
+                                    "SchoolYear": "$_id.SchoolYear",
+                                    "SemesterGPA": {
+                                        "$round": [
+                                            {"$divide": ["$totalWeighted", "$totalUnits"]}, 2
+                                        ]
+                                    },
+                                    "subjects": 1
+                                }
+                            },
 
-                    st.download_button(
-                        label="⬇️ Download CSV",
-                        data=csv,
-                        file_name="progress_tracker_by_student.csv",
-                        mime="text/csv"
-                    )
+                            # Step 11: Expand subjects back to rows
+                            {"$unwind": "$subjects"},
+                            {
+                                "$project": {
+                                    "StudentID": 1,
+                                    "Name": 1,
+                                    "SemesterID": 1,
+                                    "Semester": 1,
+                                    "SchoolYear": 1,
+                                    "SubjectCode": "$subjects.SubjectCode",
+                                    "SubjectDescription": "$subjects.SubjectDescription",
+                                    "Units": "$subjects.Units",
+                                    "Grade": "$subjects.Grade",
+                                    "SemesterGPA": 1
+                                }
+                            },
+                            {"$sort": {"SemesterID": 1, "SubjectCode": 1}}
+                        ]
+
+                        with st.spinner("Loading data..."):
+                            results = list(gradesCollection.aggregate(pipeline))
+
+                            if results:
+                                df = pd.DataFrame(results, columns=[
+                                    "StudentID", "Name", "SemesterID", "Semester", "SchoolYear",
+                                    "SubjectCode", "SubjectDescription", "Units", "Grade", "SemesterGPA"
+                                ])
+                                st.dataframe(df)
+
+                                # CSV Export
+                                csv = df.to_csv(index=False).encode("utf-8")
+                                st.download_button(
+                                    label="⬇️ Download CSV",
+                                    data=csv,
+                                    file_name=f"progress_tracker_{student_id}.csv",
+                                    mime="text/csv"
+                                )
+                            else:
+                                st.warning("⚠️ No records found for that Student ID.")
+
+                    except ValueError:
+                        st.error("❌ Please enter a valid numeric Student ID.")
+
+
+
+
 
             student_filter = {}
             student_map = {s["_id"]: s for s in studentsCollection.find(student_filter)}
