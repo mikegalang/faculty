@@ -1643,9 +1643,6 @@ else:
 
 
     elif tab_index == "Grade Submission Status":
-        #st.write("tab_grade_submission_status")
-
-        #teacher_input = st.session_state.session_teacher
 
         selected_teacher = st.session_state.session_teacher
 
@@ -1709,7 +1706,7 @@ else:
                 # Step 7: Compute submission rate
                 {
                     "$addFields": {
-                        "SubmissionRate": {
+                        "SubmissionRate (%)": {
                             "$round": [
                                 {"$multiply": [{"$divide": ["$SubmittedGrades", "$TotalStudents"]}, 100]},
                                 2
@@ -1727,7 +1724,7 @@ else:
                         "SubmittedGrades": 1,
                         "NoGrades": 1,
                         "TotalStudents": 1,
-                        "SubmissionRate": 1,
+                        "SubmissionRate (%)": 1,
                         "SemesterID": "$_id.SemesterID"
                     }
                 },
@@ -1749,7 +1746,7 @@ else:
                         "SubmittedGrades",
                         "NoGrades",
                         "TotalStudents",
-                        "SubmissionRate"
+                        "SubmissionRate (%)"
                     ]
                     df = df[column_order]
 
