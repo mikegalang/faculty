@@ -1105,27 +1105,27 @@ else:
 
 
                 st.subheader("📑 Progress Tracker by Year / Level")
+                with st.spinner("Loading data..."):
+                    data = list(gradesCollection.aggregate(pipeline))
 
-                data = list(gradesCollection.aggregate(pipeline))
+                    if data:
+                        # Convert list → DataFrame
+                        df = pd.DataFrame(data)
 
-                if data:
-                    # Convert list → DataFrame
-                    df = pd.DataFrame(data)
+                        # Show table in Streamlit
+                        st.dataframe(df)
 
-                    # Show table in Streamlit
-                    st.dataframe(df)
+                        # Export CSV
+                        csv = df.to_csv(index=False).encode("utf-8")
 
-                    # Export CSV
-                    csv = df.to_csv(index=False).encode("utf-8")
-
-                    st.download_button(
-                        label="⬇️ Download CSV",
-                        data=csv,
-                        file_name="progress_tracker_by_year.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.warning("⚠️ No records found for this subject.")
+                        st.download_button(
+                            label="⬇️ Download CSV",
+                            data=csv,
+                            file_name="progress_tracker_by_year.csv",
+                            mime="text/csv"
+                        )
+                    else:
+                        st.warning("⚠️ No records found for this subject.")
             
             if filter_type == "Student ID":
                 student_id = int(selected_value)   # <-- parameter
@@ -1265,24 +1265,25 @@ else:
                     {"$sort": {"SemesterID": 1}}
                 ]
 
-                results = list(gradesCollection.aggregate(pipeline))
+                with st.spinner("Loading data..."):
+                    results = list(gradesCollection.aggregate(pipeline))
 
-                st.subheader("📑 Progress Tracker by Student ID")
+                    st.subheader("📑 Progress Tracker by Student ID")
 
-                import pandas as pd
-                df = pd.DataFrame(results, columns=[
-                    "StudentID", "Name", "SemesterID", "SchoolYear", "Units", "Grade", "SemesterGPA"
-                ])
-                st.dataframe(df)
+                    import pandas as pd
+                    df = pd.DataFrame(results, columns=[
+                        "StudentID", "Name", "SemesterID", "SchoolYear", "Units", "Grade", "SemesterGPA"
+                    ])
+                    st.dataframe(df)
 
-                csv = df.to_csv(index=False).encode("utf-8")
+                    csv = df.to_csv(index=False).encode("utf-8")
 
-                st.download_button(
-                    label="⬇️ Download CSV",
-                    data=csv,
-                    file_name="progress_tracker_by_student.csv",
-                    mime="text/csv"
-                )
+                    st.download_button(
+                        label="⬇️ Download CSV",
+                        data=csv,
+                        file_name="progress_tracker_by_student.csv",
+                        mime="text/csv"
+                    )
 
             student_filter = {}
             student_map = {s["_id"]: s for s in studentsCollection.find(student_filter)}
