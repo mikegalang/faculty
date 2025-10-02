@@ -1106,9 +1106,26 @@ else:
 
                 st.subheader("📑 Progress Tracker by Year / Level")
 
-                with st.spinner("Loading data..."):
-                    data = list(gradesCollection.aggregate(pipeline))
-                    st.dataframe(data)
+                data = list(gradesCollection.aggregate(pipeline))
+
+                if data:
+                    # Convert list → DataFrame
+                    df = pd.DataFrame(data)
+
+                    # Show table in Streamlit
+                    st.dataframe(df)
+
+                    # Export CSV
+                    csv = df.to_csv(index=False).encode("utf-8")
+
+                    st.download_button(
+                        label="⬇️ Download CSV",
+                        data=csv,
+                        file_name="progress_tracker_by_year.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.warning("⚠️ No records found for this subject.")
             
             if filter_type == "Student ID":
                 student_id = int(selected_value)   # <-- parameter
@@ -1258,6 +1275,15 @@ else:
                 ])
                 st.dataframe(df)
 
+                csv = df.to_csv(index=False).encode("utf-8")
+
+                st.download_button(
+                    label="⬇️ Download CSV",
+                    data=csv,
+                    file_name="progress_tracker_by_student.csv",
+                    mime="text/csv"
+                )
+
             student_filter = {}
             student_map = {s["_id"]: s for s in studentsCollection.find(student_filter)}
                 
@@ -1392,116 +1418,6 @@ else:
                     st.subheader("📑 Student Grade Trends by Semester")
                     st.dataframe(result)
                     
-        # st.subheader("Student Progress Tracker")
-            
-        # # # Input filters
-        # filter_type = st.radio("Filter by:", ["Subject", "Course", "YearLevel"])
-
-        # if filter_type == "Subject":
-        #     subjects = subjectsCollection.distinct("Description")
-        #     selected_value = st.selectbox("Select Subject", subjects)
-
-        # elif filter_type == "Course":
-        #     courses = studentsCollection.distinct("Course")
-        #     selected_value = st.selectbox("Select Course", courses)
-
-        # else:  # YearLevel
-        #     years = studentsCollection.distinct("YearLevel")
-        #     selected_value = st.selectbox("Select Year Level", years)
-
-
-
-        # if selected_value:
-        #     # Build student filter if Course or YearLevel
-        #     student_filter = {}
-        #     if filter_type == "Course":
-        #         student_filter["Course"] = selected_value
-        #     elif filter_type == "YearLevel":
-        #         student_filter["YearLevel"] = selected_value
-
-        #     student_map = {s["_id"]: s for s in studentsCollection.find(student_filter)}
-
-        #     # Query Grades
-        #     if filter_type == "Subject":
-        #         subj_doc = subjectsCollection.find_one({"Description": selected_value})
-        #         subject_code = subj_doc["_id"] if subj_doc else None
-        #         if subject_code:
-        #             data = list(gradesCollection.find({"SubjectCodes": subject_code}))
-        #         else:
-        #             data = []
-        #     else:
-        #         data = list(gradesCollection.find({"StudentID": {"$in": list(student_map.keys())}}))
-
-        #     # Normalize arrays
-        #     records = []
-        #     for doc in data:
-        #         subject_codes = doc.get("SubjectCodes", [])
-        #         grades = doc.get("Grades", [])
-        #         for i in range(len(subject_codes)):
-        #             records.append({
-        #                 "StudentID": doc.get("StudentID"),
-        #                 "SubjectCode": subject_codes[i],
-        #                 "Grade": grades[i] if i < len(grades) else None,
-        #                 "SemesterID": doc.get("SemesterID")
-        #             })
-
-        #     df = pd.DataFrame(records)
-
-        #     if df.empty:
-        #         st.warning("⚠️ No records found.")
-        #     else:
-        #         # --------------------------
-        #         # PROCESS DATA
-        #         # --------------------------
-        #         # Compute average grade per student per semester
-        #         avg_per_sem = df.groupby(["StudentID", "SemesterID"])["Grade"].mean().reset_index()
-
-        #         # Pivot: one row per student, semesters as columns
-        #         pivot = avg_per_sem.pivot(index="StudentID", columns="SemesterID", values="Grade").reset_index()
-
-        #         # Merge with student names
-        #         pivot["Name"] = pivot["StudentID"].map(lambda x: student_map.get(x, {}).get("Name", "Unknown"))
-
-        #         # Compute trend (compare first vs last semester grade)
-        #         trends = []
-        #         for _, row in pivot.iterrows():
-        #             grades_series = row.drop(["StudentID", "Name"]).dropna()
-        #             if len(grades_series) >= 2:
-        #                 first = grades_series.iloc[0]
-        #                 last = grades_series.iloc[-1]
-        #                 if last > first:
-        #                     trends.append("↑ Improving")
-        #                 elif last < first:
-        #                     trends.append("↓ Declining")
-        #                 else:
-        #                     trends.append("→ Stable")
-        #             else:
-        #                 trends.append("–")
-        #         pivot["Overall Trend"] = trends
-
-        #         # Move Name next to StudentID
-        #         cols = ["StudentID", "Name"] + [c for c in pivot.columns if c not in ["StudentID", "Name", "Overall Trend"]] + ["Overall Trend"]
-        #         result = pivot[cols]
-
-        #         # --------------------------
-        #         # DISPLAY
-        #         # --------------------------
-        #         st.subheader("📑 Student Grade Trends by Semester")
-        #         st.dataframe(result)
-
-
-        #         # --- PDF Export ---
-        #         subtitle = f"Filter: {filter_type} = {selected_value}"
-        #         pdf_buffer = df_to_pdf_tracker(result, title="📑 Student Grade Trends by Semester", subtitle=subtitle)
-
-        #         st.download_button(
-        #             label="📥 Download Report as PDF",
-        #             data=pdf_buffer,
-        #             file_name="student_progress.pdf",
-        #             mime="application/pdf",
-        #         )
-
-
 
 
 
