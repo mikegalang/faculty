@@ -891,7 +891,8 @@ else:
         selected_teacher = st.session_state.session_teacher
                 
         # Input filters
-        filter_type = st.radio("Filter by:", ["Subject", "Course", "YearLevel", "Student ID"])
+        #filter_type = st.radio("Filter by:", ["Subject", "Course", "YearLevel", "Student ID"])
+        filter_type = st.radio("Filter by:", ["YearLevel", "Student ID"])
 
         if filter_type == "Subject":
             #subjects = subjectsCollection.distinct("Description")
@@ -1266,7 +1267,8 @@ else:
                 subj_doc = subjectsCollection.find_one({"Description": selected_value})
                 subject_code = subj_doc["_id"] if subj_doc else None
                 if subject_code:
-                    data = list(gradesCollection.find({"SubjectCodes": subject_code}))
+                    #data = list(gradesCollection.find({"SubjectCodes": subject_code}))
+                    data = list(gradesCollection.find({"SubjectCodes": subject_code}).limit(500))
                 else:
                     data = []
 
